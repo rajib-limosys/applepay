@@ -1,1 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Payment</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #ffffff;
+        }
+        .message {
+            font-size: 16px;
+            font-weight: 500;
+            color: #8e8e93;
+            margin-bottom: 20px;
+        }
+        /* Hide the regular credit card fields, we only want Apple Pay */
+        .hidden-fields { display: none; }
+    </style>
+    
+    <script src="https://api.payrix.com/payFieldsScript"></script>
+    
+    <script>
+        // Swift will call this to inject the session key and amount before showing the view
+        function configurePayFields(sessionKey, amountInCents) {
+            PayFields.config.txnSessionKey = sessionKey;
+            PayFields.config.merchant = "merchant.com.limosys.production"; 
+            PayFields.config.amount = amountInCents;
+            PayFields.config.applePay = true; // Tells PayFields to render the button
+            PayFields.config.mode = 'txnToken';
 
+            // Success Handler
+            PayFields.onSuccess = function(response) {
+                if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
+                    window.webkit.messageHandlers.applePayHandler.postMessage({
+                        status: 'success', 
+                        data: response
+                    });
+                }
+            };
+
+            // Failure Handler
+            PayFields.onFailure = function() {
+                if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
+                    window.webkit.messageHandlers.applePayHandler.postMessage({
+                        status: 'error', 
+                        error: 'Payment Failed in PayFields'
+                    });
+                }
+            };
+        }
+    </script>
+</head>
+<body>
+    <div class="message">Tap below to pay</div>
+    
+    <div class="hidden-fields">
+        <div id="number" class="form-row"></div>
+        <div id="expiration" class="form-row"></div>
+        <div id="cvv" class="form-row"></div>
+    </div>
+</body>
+</html>
