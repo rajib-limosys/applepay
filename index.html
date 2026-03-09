@@ -21,15 +21,26 @@
             color: #333333;
             margin-bottom: 30px;
         }
-        /* We must hide the standard credit card fields because we only want the Apple Pay button */
+        /* Hide the standard credit card inputs */
         .hidden-fields { display: none; }
+        
+        /* Ensure the Apple Pay container has enough space to render */
+        .button-container {
+            width: 250px;
+            min-height: 50px;
+            display: flex;
+            justify-content: center;
+        }
     </style>
     
-    <!-- <script src="https://test-api.payrix.com/payFieldsScript"></script> -->
     <script src="https://api.payrix.com/payFieldsScript"></script>
 </head>
 <body>
     <div class="instruction">Tap below to complete payment</div>
+    
+    <div class="button-container">
+        <button type="button" id="button" name="Submit" style="display: none;">Submit</button>
+    </div>
     
     <div class="hidden-fields">
         <div id="number" class="form-row"></div>
@@ -38,22 +49,19 @@
     </div>
 
     <script>
-        // 1. Get parameters passed from Swift URL
         const urlParams = new URLSearchParams(window.location.search);
         const sessionKey = urlParams.get('session');
         const amountInCents = urlParams.get('amount');
 
-        // 2. Configure PayFields
         if (sessionKey && amountInCents) {
             PayFields.config.txnSessionKey = sessionKey;
-            PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; // Must match your Apple Merchant ID
+            PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; 
             PayFields.config.amount = amountInCents;
             
             // Critical for Apple Pay
             PayFields.config.applePay = true; 
             PayFields.config.mode = 'txnToken';
 
-            // 3. Handle Success
             PayFields.onSuccess = function(response) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
@@ -63,12 +71,12 @@
                 }
             };
 
-            // 4. Handle Failure/Validation Errors
-            PayFields.onFailure = function() {
+            PayFields.onFailure = function(errors) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
                         status: 'error', 
-                        error: 'Payment failed or was cancelled.'
+                        error: 'Payment failed or was cancelled.',
+                        details: errors
                     });
                 }
             };
