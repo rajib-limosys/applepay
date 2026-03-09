@@ -36,12 +36,13 @@
         .hidden-fields { display: none; }
     </style>
     
-    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
     <script src="https://api.payrix.com/payFieldsScript"></script>
 </head>
 <body>
-    <div class="instruction">Tap below to complete payment for the trip</div>
+    <div class="instruction">Tap below to complete payment</div>
     
+    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
+
     <apple-pay-button buttonstyle="black" type="plain" locale="en"></apple-pay-button>
     
     <div class="hidden-fields">
@@ -58,26 +59,26 @@
 
         if (sessionKey && amountInCents) {
             
-            // 1. Config
+            // Config
             PayFields.config.txnSessionKey = sessionKey;
             PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; 
             PayFields.config.amount = amountInCents;
             PayFields.config.mode = 'txnToken';
             
-            // Enable Apple Pay
-            PayFields.config.applePay = true; 
+            // Enable Apple Pay using the object syntax
+            PayFields.config.applePay = { enabled: true };
 
-            // 2. REQUIRED: Map the fields so the PayFields engine actually initializes
+            // REQUIRED: Map the fields so the PayFields engine actually initializes
             PayFields.fields = [
                 { type: 'number', element: '#number' },
                 { type: 'cvv', element: '#cvv' },
                 { type: 'expiration', element: '#expiration' }
             ];
 
-            // 3. REQUIRED: Map the hidden submit button
+            // REQUIRED: Map the hidden submit button
             PayFields.button = { element: "#submit" };
 
-            // 4. Callbacks
+            // Callbacks
             PayFields.onSuccess = function(response) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
