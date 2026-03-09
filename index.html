@@ -23,18 +23,16 @@
             margin-bottom: 30px;
         }
         
-        /* This exact CSS is required by Apple WebKit to render the Shadow DOM button */
+        /* REQUIRED BY APPLE: Renders the Shadow DOM button */
         apple-pay-button {
             --webkit-appearance: -apple-pay-button;
             --apple-pay-button-width: 250px;
             --apple-pay-button-height: 45px;
             --apple-pay-button-border-radius: 6px;
-            --apple-pay-button-padding: 0px 0px;
-            --apple-pay-button-box-sizing: border-box;
             display: inline-block;
         }
         
-        /* Hide the standard credit card inputs */
+        /* Hide the PayFields standard inputs and button */
         .hidden-fields { display: none; }
     </style>
     
@@ -42,14 +40,15 @@
     <script src="https://api.payrix.com/payFieldsScript"></script>
 </head>
 <body>
-    <div class="instruction">Tap below to complete payment</div>
+    <div class="instruction">Tap below to complete payment for the trip</div>
     
     <apple-pay-button buttonstyle="black" type="plain" locale="en"></apple-pay-button>
     
     <div class="hidden-fields">
-        <div id="number" class="form-row"></div>
-        <div id="expiration" class="form-row"></div>
-        <div id="cvv" class="form-row"></div>
+        <div id="number"></div>
+        <div id="expiration"></div>
+        <div id="cvv"></div>
+        <button type="button" id="submit" name="Submit"></button>
     </div>
 
     <script>
@@ -59,16 +58,26 @@
 
         if (sessionKey && amountInCents) {
             
-            // Configure PayFields
+            // 1. Config
             PayFields.config.txnSessionKey = sessionKey;
             PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; 
             PayFields.config.amount = amountInCents;
             PayFields.config.mode = 'txnToken';
-
-            // Payrix Digital Wallet Config
+            
+            // Enable Apple Pay
             PayFields.config.applePay = true; 
 
-            // Handle Success
+            // 2. REQUIRED: Map the fields so the PayFields engine actually initializes
+            PayFields.fields = [
+                { type: 'number', element: '#number' },
+                { type: 'cvv', element: '#cvv' },
+                { type: 'expiration', element: '#expiration' }
+            ];
+
+            // 3. REQUIRED: Map the hidden submit button
+            PayFields.button = { element: "#submit" };
+
+            // 4. Callbacks
             PayFields.onSuccess = function(response) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
@@ -78,7 +87,6 @@
                 }
             };
 
-            // Handle Failure
             PayFields.onFailure = function(errors) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
