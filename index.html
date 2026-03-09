@@ -3,27 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Secure Apple Pay Checkout</title>
+    <title>Apple Pay Diagnostic</title>
     
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #ffffff;
+            font-family: -apple-system, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            height: 100vh; margin: 0; padding: 20px; box-sizing: border-box;
         }
-        .instruction {
-            font-size: 18px;
-            font-weight: 500;
-            color: #333333;
-            margin-bottom: 30px;
-        }
+        .instruction { font-size: 18px; font-weight: bold; margin-bottom: 20px; }
         
-        /* REQUIRED BY APPLE: Renders the Shadow DOM button */
         apple-pay-button {
             --webkit-appearance: -apple-pay-button;
             --apple-pay-button-width: 250px;
@@ -32,8 +21,14 @@
             display: inline-block;
         }
         
-        /* Hide the PayFields standard inputs and button */
         .hidden-fields { display: none; }
+        
+        /* Debug Console Styles */
+        #debug-console {
+            margin-top: 30px; padding: 10px; background: #f0f0f0; border: 1px solid #ccc;
+            width: 100%; max-width: 300px; font-size: 12px; color: #d32f2f;
+            font-family: monospace; word-wrap: break-word; text-align: left;
+        }
     </style>
     
     <script src="https://api.payrix.com/payFieldsScript"></script>
@@ -42,63 +37,64 @@
     <div class="instruction">Tap below to complete payment</div>
     
     <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
-
     <apple-pay-button buttonstyle="black" type="plain" locale="en"></apple-pay-button>
     
     <div class="hidden-fields">
-        <div id="number"></div>
-        <div id="expiration"></div>
-        <div id="cvv"></div>
+        <div id="number"></div><div id="expiration"></div><div id="cvv"></div>
         <button type="button" id="submit" name="Submit"></button>
     </div>
 
+    <div id="debug-console"><strong>SYSTEM DIAGNOSTIC:</strong><br></div>
+
     <script>
+        function logDebug(msg) {
+            document.getElementById('debug-console').innerHTML += msg + "<br>";
+        }
+
+        // 1. Check if Apple Pay even exists in this environment
+        if (window.ApplePaySession) {
+            logDebug("✅ ApplePaySession Exists");
+            var canMake = window.ApplePaySession.canMakePayments();
+            logDebug("✅ canMakePayments: " + canMake);
+        } else {
+            logDebug("❌ ERROR: ApplePaySession is completely missing. WebKit is blocking it.");
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         const sessionKey = urlParams.get('session');
         const amountInCents = urlParams.get('amount');
 
         if (sessionKey && amountInCents) {
+            logDebug("✅ Session Key & Amount Received");
             
-            // Config
             PayFields.config.txnSessionKey = sessionKey;
             PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; 
             PayFields.config.amount = amountInCents;
             PayFields.config.mode = 'txnToken';
-            
-            // Enable Apple Pay using the object syntax
             PayFields.config.applePay = { enabled: true };
 
-            // REQUIRED: Map the fields so the PayFields engine actually initializes
             PayFields.fields = [
                 { type: 'number', element: '#number' },
                 { type: 'cvv', element: '#cvv' },
                 { type: 'expiration', element: '#expiration' }
             ];
-
-            // REQUIRED: Map the hidden submit button
             PayFields.button = { element: "#submit" };
 
-            // Callbacks
             PayFields.onSuccess = function(response) {
+                logDebug("✅ Payrix Success Callback Hit");
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
-                    window.webkit.messageHandlers.applePayHandler.postMessage({
-                        status: 'success', 
-                        data: response
-                    });
+                    window.webkit.messageHandlers.applePayHandler.postMessage({ status: 'success', data: response });
                 }
             };
 
             PayFields.onFailure = function(errors) {
+                logDebug("❌ Payrix Failed: " + JSON.stringify(errors));
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
-                    window.webkit.messageHandlers.applePayHandler.postMessage({
-                        status: 'error', 
-                        error: 'Payment failed or was cancelled.',
-                        details: errors
-                    });
+                    window.webkit.messageHandlers.applePayHandler.postMessage({ status: 'error', error: 'Payment failed.', details: errors });
                 }
             };
         } else {
-            document.querySelector('.instruction').innerText = "Session configuration missing.";
+            logDebug("❌ ERROR: Missing URL Parameters");
         }
     </script>
 </body>
