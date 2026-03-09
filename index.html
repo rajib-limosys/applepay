@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Secure Apple Pay Checkout</title>
+    
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -21,26 +22,29 @@
             color: #333333;
             margin-bottom: 30px;
         }
+        
+        /* This exact CSS is required by Apple WebKit to render the Shadow DOM button */
+        apple-pay-button {
+            --webkit-appearance: -apple-pay-button;
+            --apple-pay-button-width: 250px;
+            --apple-pay-button-height: 45px;
+            --apple-pay-button-border-radius: 6px;
+            --apple-pay-button-padding: 0px 0px;
+            --apple-pay-button-box-sizing: border-box;
+            display: inline-block;
+        }
+        
         /* Hide the standard credit card inputs */
         .hidden-fields { display: none; }
-        
-        /* Ensure the Apple Pay container has enough space to render */
-        .button-container {
-            width: 250px;
-            min-height: 50px;
-            display: flex;
-            justify-content: center;
-        }
     </style>
     
+    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
     <script src="https://api.payrix.com/payFieldsScript"></script>
 </head>
 <body>
     <div class="instruction">Tap below to complete payment</div>
     
-    <div class="button-container">
-        <button type="button" id="button" name="Submit" style="display: none;">Submit</button>
-    </div>
+    <apple-pay-button buttonstyle="black" type="plain" locale="en"></apple-pay-button>
     
     <div class="hidden-fields">
         <div id="number" class="form-row"></div>
@@ -54,14 +58,17 @@
         const amountInCents = urlParams.get('amount');
 
         if (sessionKey && amountInCents) {
+            
+            // Configure PayFields
             PayFields.config.txnSessionKey = sessionKey;
             PayFields.config.merchant = "p1_mer_65f480fcb8309191c7819c8"; 
             PayFields.config.amount = amountInCents;
-            
-            // Critical for Apple Pay
-            PayFields.config.applePay = true; 
             PayFields.config.mode = 'txnToken';
 
+            // Payrix Digital Wallet Config
+            PayFields.config.applePay = true; 
+
+            // Handle Success
             PayFields.onSuccess = function(response) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
@@ -71,6 +78,7 @@
                 }
             };
 
+            // Handle Failure
             PayFields.onFailure = function(errors) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
