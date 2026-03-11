@@ -3,201 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pure Apple Pay UI Test</title>
+    <title>Secure Apple Pay Checkout (SANDBOX)</title>
     
     <style>
         body {
+            font-family: -apple-system, sans-serif;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            height: 100vh; margin: 0; font-family: -apple-system, sans-serif;
-            background-color: #ffffff;
+            height: 100vh; margin: 0; background-color: #ffffff;
         }
-        
-        #status-text {
-            font-size: 16px; color: #333; margin-bottom: 30px; text-align: center; padding: 0 20px;
-        }
+        .instruction { font-size: 18px; font-weight: 500; color: #333333; margin-bottom: 30px; }
         
         apple-pay-button {
             --webkit-appearance: -apple-pay-button;
             --apple-pay-button-width: 250px;
             --apple-pay-button-height: 45px;
             --apple-pay-button-border-radius: 6px;
-            display: none; /* Hidden by default, revealed by JS if allowed */
-        }
-    </style>
-    
-    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
-</head>
-<body>
-    <div id="status-text">Checking Apple Pay Support...</div>
-    
-    <apple-pay-button id="apple-pay-btn" buttonstyle="black" type="plain" locale="en"></apple-pay-button>
-
-    <script>
-        const statusEl = document.getElementById('status-text');
-        const applePayBtn = document.getElementById('apple-pay-btn');
-        const APPLE_MERCHANT_ID = 'merchant.com.limosys.production'; // Must exactly match your Apple portal
-
-        // 1. Check if ApplePaySession exists in this browser/WebView
-        if (window.ApplePaySession) {
-            
-            // 2. Check if the device can make payments with this specific Merchant ID
-            const promise = ApplePaySession.canMakePaymentsWithActiveCard(APPLE_MERCHANT_ID);
-            
-            promise.then(function (canMakePayments) {
-                if (canMakePayments) {
-                    statusEl.innerText = "✅ Apple Pay is Ready! Tap below.";
-                    applePayBtn.style.display = "inline-block";
-                } else {
-                    statusEl.innerText = "⚠️ Apple Pay supported, but no active card found OR Domain Verification failed.";
-                    // We will force it to show anyway just to see if the UI renders
-                    applePayBtn.style.display = "inline-block"; 
-                }
-            }).catch(function(error) {
-                statusEl.innerText = "❌ Error checking Apple Pay: " + error;
-            });
-            
-        } else {
-            statusEl.innerText = "❌ ApplePaySession is blocked or unavailable in this WKWebView.";
-        }
-
-        // 3. Handle the Button Click
-        applePayBtn.addEventListener('click', function() {
-            
-            statusEl.innerText = "Button Tapped! Opening sheet...";
-            
-            const paymentRequest = {
-                countryCode: 'US',
-                currencyCode: 'USD',
-                supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-                merchantCapabilities: ['supports3DS'],
-                total: { label: 'Limosys Test', amount: '10.00' }
-            };
-
-            try {
-                const session = new ApplePaySession(3, paymentRequest);
-
-                // When the sheet pops up, Apple asks your server to validate the merchant
-                session.onvalidatemerchant = function(event) {
-                    statusEl.innerText = "Apple Pay Sheet is open! (Validation URL: " + event.validationURL + ")";
-                    
-                    // We will just abort it here because we don't have a real backend validation setup for this test
-                    session.abort();
-                    
-                    if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
-                        window.webkit.messageHandlers.applePayHandler.postMessage({
-                            status: 'error',
-                            error: 'UI Test Complete. The Apple Pay sheet successfully rendered.'
-                        });
-                    }
-                };
-
-                session.begin();
-                
-            } catch (e) {
-                statusEl.innerText = "❌ Crash on session.begin(): " + e.message;
-            }
-        });
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pure Apple Pay UI Test</title>
-    
-    <style>
-        body {
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            height: 100vh; margin: 0; font-family: -apple-system, sans-serif;
-            background-color: #ffffff;
+            display: inline-block;
         }
         
-        #status-text {
-            font-size: 16px; color: #333; margin-bottom: 30px; text-align: center; padding: 0 20px;
-        }
-        
-        apple-pay-button {
-            --webkit-appearance: -apple-pay-button;
-            --apple-pay-button-width: 250px;
-            --apple-pay-button-height: 45px;
-            --apple-pay-button-border-radius: 6px;
-            display: none; /* Hidden by default, revealed by JS if allowed */
-        }
+        .hidden-fields { display: none; }
     </style>
     
-    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
+    <script src="https://test-api.payrix.com/payFieldsScript"></script>
 </head>
 <body>
-    <div id="status-text">Checking Apple Pay Support...</div>
+    <div class="instruction">Tap below to complete payment (TEST)</div>
     
-    <apple-pay-button id="apple-pay-btn" buttonstyle="black" type="plain" locale="en"></apple-pay-button>
+    <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
+    <apple-pay-button buttonstyle="black" type="plain" locale="en"></apple-pay-button>
+    
+    <div class="hidden-fields">
+        <div id="number"></div><div id="expiration"></div><div id="cvv"></div>
+        <button type="button" id="submit" name="Submit"></button>
+    </div>
 
     <script>
-        const statusEl = document.getElementById('status-text');
-        const applePayBtn = document.getElementById('apple-pay-btn');
-        const APPLE_MERCHANT_ID = 'merchant.com.limosys.production'; // Must exactly match your Apple portal
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionKey = urlParams.get('session');
+        const amountInCents = urlParams.get('amount');
 
-        // 1. Check if ApplePaySession exists in this browser/WebView
-        if (window.ApplePaySession) {
+        if (sessionKey && amountInCents) {
             
-            // 2. Check if the device can make payments with this specific Merchant ID
-            const promise = ApplePaySession.canMakePaymentsWithActiveCard(APPLE_MERCHANT_ID);
+            PayFields.config.txnSessionKey = sessionKey;
             
-            promise.then(function (canMakePayments) {
-                if (canMakePayments) {
-                    statusEl.innerText = "✅ Apple Pay is Ready! Tap below.";
-                    applePayBtn.style.display = "inline-block";
-                } else {
-                    statusEl.innerText = "⚠️ Apple Pay supported, but no active card found OR Domain Verification failed.";
-                    // We will force it to show anyway just to see if the UI renders
-                    applePayBtn.style.display = "inline-block"; 
+            // YOUR SANDBOX MERCHANT ID
+            PayFields.config.merchant = "t1_mer_6356cc1e22dde730e936206"; 
+            
+            PayFields.config.amount = amountInCents;
+            PayFields.config.mode = 'txnToken';
+            PayFields.config.applePay = { enabled: true };
+
+            PayFields.fields = [
+                { type: 'number', element: '#number' },
+                { type: 'cvv', element: '#cvv' },
+                { type: 'expiration', element: '#expiration' }
+            ];
+            PayFields.button = { element: "#submit" };
+
+            // SUCCESS HANDLER
+            PayFields.onSuccess = function(response) {
+                if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
+                    window.webkit.messageHandlers.applePayHandler.postMessage({
+                        status: 'success', 
+                        data: response
+                    });
                 }
-            }).catch(function(error) {
-                statusEl.innerText = "❌ Error checking Apple Pay: " + error;
-            });
-            
-        } else {
-            statusEl.innerText = "❌ ApplePaySession is blocked or unavailable in this WKWebView.";
-        }
-
-        // 3. Handle the Button Click
-        applePayBtn.addEventListener('click', function() {
-            
-            statusEl.innerText = "Button Tapped! Opening sheet...";
-            
-            const paymentRequest = {
-                countryCode: 'US',
-                currencyCode: 'USD',
-                supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-                merchantCapabilities: ['supports3DS'],
-                total: { label: 'Limosys Test', amount: '10.00' }
             };
 
-            try {
-                const session = new ApplePaySession(3, paymentRequest);
-
-                // When the sheet pops up, Apple asks your server to validate the merchant
-                session.onvalidatemerchant = function(event) {
-                    statusEl.innerText = "Apple Pay Sheet is open! (Validation URL: " + event.validationURL + ")";
-                    
-                    // We will just abort it here because we don't have a real backend validation setup for this test
-                    session.abort();
-                    
-                    if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
-                        window.webkit.messageHandlers.applePayHandler.postMessage({
-                            status: 'error',
-                            error: 'UI Test Complete. The Apple Pay sheet successfully rendered.'
-                        });
-                    }
-                };
-
-                session.begin();
-                
-            } catch (e) {
-                statusEl.innerText = "❌ Crash on session.begin(): " + e.message;
-            }
-        });
+            // FAILURE HANDLER
+            PayFields.onFailure = function(errors) {
+                if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
+                    window.webkit.messageHandlers.applePayHandler.postMessage({
+                        status: 'error', 
+                        error: 'Payment failed or was cancelled.',
+                        details: errors
+                    });
+                }
+            };
+        } else {
+            document.querySelector('.instruction').innerText = "Session missing.";
+        }
     </script>
 </body>
 </html>
