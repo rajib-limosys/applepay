@@ -44,15 +44,14 @@
 
         if (sessionKey && amountInCents) {
             
+            // 1. Configure PayFields
             PayFields.config.txnSessionKey = sessionKey;
-            
-            // YOUR SANDBOX MERCHANT ID
-            PayFields.config.merchant = "t1_mer_6356cc1e22dde730e936206"; 
-            
+            PayFields.config.merchant = "t1_mer_6356cc1e22dde730e936206"; // YOUR SANDBOX MERCHANT ID
             PayFields.config.amount = amountInCents;
             PayFields.config.mode = 'txnToken';
             PayFields.config.applePay = { enabled: true };
 
+            // 2. Map the hidden fields
             PayFields.fields = [
                 { type: 'number', element: '#number' },
                 { type: 'cvv', element: '#cvv' },
@@ -60,7 +59,7 @@
             ];
             PayFields.button = { element: "#submit" };
 
-            // SUCCESS HANDLER
+            // 3. Handle Success (Sends Payrix token to your iOS App)
             PayFields.onSuccess = function(response) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
@@ -70,7 +69,7 @@
                 }
             };
 
-            // FAILURE HANDLER
+            // 4. Handle Failure
             PayFields.onFailure = function(errors) {
                 if (window.webkit && window.webkit.messageHandlers.applePayHandler) {
                     window.webkit.messageHandlers.applePayHandler.postMessage({
