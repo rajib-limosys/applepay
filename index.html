@@ -64,7 +64,6 @@
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const sessionKey = urlParams.get("session");
     const amountInCents = urlParams.get("amount");
     const jobId = urlParams.get("jobId");
     const deviceId = urlParams.get("deviceId");
@@ -189,7 +188,6 @@
             postToIOS({
               status: "success",
               data: {
-                sessionKey: sessionKey,
                 amountInCents: Number(amountInCents),
                 billingContact: {
                   givenName: billingContact.givenName || "",
@@ -237,8 +235,8 @@
     }
 
     async function initApplePayButton() {
-      if (!sessionKey || !amountInCents) {
-        showMessage("Session missing.");
+      if (!amountInCents) {
+        showMessage("Amount missing.");
         return;
       }
 
