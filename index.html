@@ -2,35 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-  />
-  <title>Secure Apple Pay Checkout (SANDBOX)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Limosys Apple Pay Bridge</title>
 
   <style>
     body {
-      font-family: -apple-system, sans-serif;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
+      display: flex; 
+      justify-content: center; 
       align-items: center;
-      height: 100vh;
-      margin: 0;
-      background-color: #ffffff;
+      height: 100vh; 
+      margin: 0; 
+      /* Make the web background transparent to blend into your iOS app */
+      background-color: transparent; 
+      -webkit-user-select: none; 
+      user-select: none;
     }
-
-    .instruction {
-      font-size: 18px;
-      font-weight: 500;
-      color: #333333;
-      margin-bottom: 30px;
-      text-align: center;
-      padding: 0 16px;
-    }
-
+    
     apple-pay-button {
-      -webkit-appearance: -apple-pay-button; /* Fixed double-dash typo */
+      -webkit-appearance: -apple-pay-button;
       -apple-pay-button-width: 250px;
       -apple-pay-button-height: 45px;
       -apple-pay-button-border-radius: 6px;
@@ -41,14 +30,8 @@
   <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
 </head>
 <body>
-  <div class="instruction" id="instruction">Tap below to complete payment (TEST)</div>
-
-  <apple-pay-button
-    id="applePayButton"
-    buttonstyle="black"
-    type="plain"
-    locale="en"
-  ></apple-pay-button>
+  
+  <apple-pay-button id="applePayButton" buttonstyle="black" type="plain" locale="en"></apple-pay-button>
 
   <script>
     const urlParams = new URLSearchParams(window.location.search);
@@ -57,200 +40,98 @@
     const deviceId = urlParams.get("deviceId");
     const custId = urlParams.get("custId");
 
-    const instructionEl = document.getElementById("instruction");
     const applePayButton = document.getElementById("applePayButton");
-
-    // Replace with your real JlimoWSJson endpoint
-    const merchantValidationUrl = "https://limosystest.pl.tripslink.com/JlimoWSJson/jlimowsjson"; 
+    let currentApplePaySession = null;
 
     function postToIOS(payload) {
-      if (
-        window.webkit &&
-        window.webkit.messageHandlers &&
-        window.webkit.messageHandlers.applePayHandler
-      ) {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.applePayHandler) {
         window.webkit.messageHandlers.applePayHandler.postMessage(payload);
-      } else {
-        console.log("iOS bridge payload:", payload);
       }
     }
 
-    async function postJson(url, body) {
-      const response = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(body)
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.message || "Request failed");
+    // --- Swift Callbacks ---
+    window.completeApplePayValidation = function(merchantSessionJsonStr) {
+      if (currentApplePaySession) {
+        try {
+          const merchantSession = JSON.parse(merchantSessionJsonStr);
+          const sessionData = merchantSession.data || merchantSession;
+          currentApplePaySession.completeMerchantValidation(sessionData);
+        } catch (e) {
+          currentApplePaySession.abort();
+          postToIOS({ status: "error", error: "Validation parse failed." });
+        }
       }
+    };
 
-      return data;
-    }
-
-    function showMessage(message) {
-      instructionEl.textContent = message;
-    }
-
-    function getAmountDecimal(centsString) {
-      const cents = Number(centsString);
-      if (!Number.isFinite(cents) || cents <= 0) return null;
-      return (cents / 100).toFixed(2);
-    }
+    window.abortApplePayValidation = function() {
+      if (currentApplePaySession) currentApplePaySession.abort();
+    };
+    // -----------------------
 
     async function startApplePay() {
       try {
-        if (!window.ApplePaySession) {
-          showMessage("Apple Pay is not available on this device/browser.");
-          return;
-        }
-
-        if (!amountInCents) {
-          showMessage("Amount missing.");
-          return;
-        }
-
-        const amountDecimal = getAmountDecimal(amountInCents);
-        if (!amountDecimal) {
-          showMessage("Invalid amount.");
-          return;
-        }
-
+        const amountDecimal = (Number(amountInCents) / 100).toFixed(2);
         const request = {
           countryCode: "US",
           currencyCode: "USD",
           supportedNetworks: ["visa", "masterCard", "amex", "discover"],
           merchantCapabilities: ["supports3DS"],
           requiredBillingContactFields: ["postalAddress", "name"],
-          total: {
-            label: "Trip Payment",
-            amount: amountDecimal
-          }
+          total: { label: "Trip Payment", amount: amountDecimal }
         };
 
         const session = new ApplePaySession(3, request);
+        currentApplePaySession = session;
 
-        session.onvalidatemerchant = async function (event) {
-          try {
-            const merchantSession = await postJson(merchantValidationUrl, {
-              client: "ios",
-              calls: [
-                {
-                  method: "CreateApplePaySession",
-                  params: JSON.stringify({
-                    jobId: jobId ? Number(jobId) : 0,
-                    deviceId: deviceId || "",
-                    custId: custId ? Number(custId) : 0,
-                    body: {
-                      validationDomain: "rajib-limosys.github.io"
-                    }
-                  })
-                }
-              ]
-            });
-
-            // Pass the generated session back to Apple
-            session.completeMerchantValidation(merchantSession.data || merchantSession);
-          } catch (error) {
-            session.abort();
-            postToIOS({
-              status: "error",
-              error: "Merchant validation failed.",
-              details: error.message
-            });
-            showMessage("Merchant validation failed.");
-          }
+        // 1. Merchant Validation - Silently calls Swift
+        session.onvalidatemerchant = function (event) {
+          postToIOS({
+            action: "validateMerchant",
+            payload: {
+              jobId: jobId ? Number(jobId) : 0,
+              deviceId: deviceId || "",
+              custId: custId ? Number(custId) : 0,
+              validationDomain: window.location.hostname
+            }
+          });
         };
 
+        // 2. Payment Authorized - Silently passes token to Swift
         session.onpaymentauthorized = function (event) {
           try {
             const payment = event.payment;
-            const billingContact = payment.billingContact || {};
-            const token = payment.token || {};
-
             postToIOS({
               status: "success",
               data: {
                 amountInCents: Number(amountInCents),
-                billingContact: {
-                  givenName: billingContact.givenName || "",
-                  familyName: billingContact.familyName || "",
-                  addressLines: billingContact.addressLines || [],
-                  locality: billingContact.locality || "",
-                  administrativeArea: billingContact.administrativeArea || "",
-                  postalCode: billingContact.postalCode || "",
-                  countryCode: billingContact.countryCode || ""
-                },
-                token: token
+                billingContact: payment.billingContact || {},
+                token: payment.token || {}
               }
             });
-
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
-            showMessage("Payment processing...");
           } catch (error) {
             session.completePayment(ApplePaySession.STATUS_FAILURE);
-            postToIOS({
-              status: "error",
-              error: "Payment authorization handling failed.",
-              details: error.message
-            });
-            showMessage("Payment failed.");
+            postToIOS({ status: "error", error: "Authorization failed." });
           }
         };
 
+        // 3. User cancels
         session.oncancel = function () {
-          postToIOS({
-            status: "error",
-            error: "Payment failed or was cancelled."
-          });
-          showMessage("Payment cancelled.");
+          postToIOS({ status: "error", error: "User cancelled." });
         };
 
+        // This instantly pops open the Apple Pay sheet
         session.begin();
       } catch (error) {
-        postToIOS({
-          status: "error",
-          error: "Apple Pay failed to start.",
-          details: error.message
-        });
-        showMessage("Apple Pay failed to start.");
+        postToIOS({ status: "error", error: "Apple Pay failed to start." });
       }
     }
 
-    async function initApplePayButton() {
-      if (!amountInCents) {
-        showMessage("Amount missing.");
-        return;
-      }
-
-      if (!window.ApplePaySession) {
-        showMessage("Apple Pay is unavailable on this device/browser.");
-        return;
-      }
-
-      try {
-        const supported =
-          ApplePaySession.supportsVersion(3) && ApplePaySession.canMakePayments();
-
-        if (supported) {
-          applePayButton.style.display = "inline-block";
-          applePayButton.addEventListener("click", startApplePay);
-        } else {
-          showMessage("Apple Pay is not set up on this device.");
-        }
-      } catch (error) {
-        console.error("Unable to initialize Apple Pay.", error);
-        showMessage("Unable to initialize Apple Pay.");
-      }
+    // Check support and show button
+    if (amountInCents && window.ApplePaySession && ApplePaySession.supportsVersion(3) && ApplePaySession.canMakePayments()) {
+      applePayButton.style.display = "inline-block";
+      applePayButton.addEventListener("click", startApplePay);
     }
-
-    initApplePayButton();
   </script>
 </body>
 </html>
