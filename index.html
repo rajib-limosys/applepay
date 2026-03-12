@@ -30,19 +30,14 @@
     }
 
     apple-pay-button {
-      --webkit-appearance: -apple-pay-button;
-      --apple-pay-button-width: 250px;
-      --apple-pay-button-height: 45px;
-      --apple-pay-button-border-radius: 6px;
-      display: none;
-    }
-
-    .hidden-fields {
+      -webkit-appearance: -apple-pay-button; /* Fixed double-dash typo */
+      -apple-pay-button-width: 250px;
+      -apple-pay-button-height: 45px;
+      -apple-pay-button-border-radius: 6px;
       display: none;
     }
   </style>
 
-  <script src="https://test-api.payrix.com/payFieldsScript"></script>
   <script crossorigin src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
 </head>
 <body>
@@ -55,13 +50,6 @@
     locale="en"
   ></apple-pay-button>
 
-  <div class="hidden-fields">
-    <div id="number"></div>
-    <div id="expiration"></div>
-    <div id="cvv"></div>
-    <button type="button" id="submit" name="Submit"></button>
-  </div>
-
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const amountInCents = urlParams.get("amount");
@@ -72,8 +60,8 @@
     const instructionEl = document.getElementById("instruction");
     const applePayButton = document.getElementById("applePayButton");
 
-    const merchantIdentifier = "merchant.com.your.applepay.sandbox"; // replace with your real Apple Pay merchant ID
-    const merchantValidationUrl = "https://limosystest.pl.tripslink.com/JlimoWSJson/jlimowsjson"; // JlimoWSJson endpoint for CreateApplePaySession
+    // Replace with your real JlimoWSJson endpoint
+    const merchantValidationUrl = "https://limosystest.pl.tripslink.com/JlimoWSJson/jlimowsjson"; 
 
     function postToIOS(payload) {
       if (
@@ -123,8 +111,8 @@
           return;
         }
 
-        if (!sessionKey || !amountInCents) {
-          showMessage("Session or amount missing.");
+        if (!amountInCents) {
+          showMessage("Amount missing.");
           return;
         }
 
@@ -141,7 +129,7 @@
           merchantCapabilities: ["supports3DS"],
           requiredBillingContactFields: ["postalAddress", "name"],
           total: {
-            label: "Application Fee",
+            label: "Trip Payment",
             amount: amountDecimal
           }
         };
@@ -167,7 +155,8 @@
               ]
             });
 
-            session.completeMerchantValidation(merchantSession.data);
+            // Pass the generated session back to Apple
+            session.completeMerchantValidation(merchantSession.data || merchantSession);
           } catch (error) {
             session.abort();
             postToIOS({
@@ -203,7 +192,7 @@
             });
 
             session.completePayment(ApplePaySession.STATUS_SUCCESS);
-            showMessage("Payment authorized.");
+            showMessage("Payment processing...");
           } catch (error) {
             session.completePayment(ApplePaySession.STATUS_FAILURE);
             postToIOS({
